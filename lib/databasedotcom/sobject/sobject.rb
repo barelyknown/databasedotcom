@@ -77,14 +77,15 @@ module Databasedotcom
       #    c.save
       def save
         attr_hash = {}
-        self.class.description["fields"].select { |f| f["updateable"] }.collect { |f| f["name"] }.each { |attr| attr_hash[attr] = self.send(attr) }
+        self.class.type_map.select { |key, value| value[:updateable?] || value[:createable?]}.collect {|key, value| key }.each { |attr| attr_hash[attr] = self.send(attr) }
 
         if self.Id.nil?
           self.client.create(self.class, attr_hash)
         else
+          attr_hash.delete_if { |key, value| !self.class.type_map[key][:updateable?] }
           self.client.update(self.class, self.Id, attr_hash)
         end
-      end
+      end  
 
       # Deletes the corresponding record from the Force.com database. Returns self.
       #
@@ -135,7 +136,7 @@ module Databasedotcom
         self.description["fields"].each do |field|
           name = field["name"]
           attr_accessor name.to_sym
-          self.type_map[name] = {:type => field["type"], :label => field["label"], :picklist_values => field["picklistValues"], :updateable? => field["updateable"]}
+          self.type_map[name] = {:type => field["type"], :label => field["label"], :picklist_values => field["picklistValues"], :updateable? => field["updateable"], :createable? => field["createable"]}
         end
       end
 
