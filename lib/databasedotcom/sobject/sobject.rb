@@ -51,7 +51,7 @@ module Databasedotcom
       #    c = Car.new
       #    c.update_attribute("Color", "Blue")
       def update_attribute(attr_name, attr_value)
-        update_attributes(attr_name => attr_value)
+        update_attributes(attr_name => attr_value) if self.class.updateable?(attr_name)
       end
 
       # Updates the corresponding record on Force.com with the attributes specified by the +new_attrs+ hash.
@@ -60,7 +60,7 @@ module Databasedotcom
       #    c = Car.new
       #    c.update_attributes {"Color" => "Blue", "Year" => "2012"}
       def update_attributes(new_attrs)
-        if self.client.update(self.class, self.Id, new_attrs)
+        if self.client.update(self.class, self.Id, self.class.updateable_only(new_attrs))
           new_attrs = new_attrs.is_a?(Hash) ? new_attrs : JSON.parse(new_attrs)
           new_attrs.each do |attr, value|
             self.send("#{attr}=", value)
@@ -68,7 +68,7 @@ module Databasedotcom
         end
         self
       end
-
+      
       # Updates the corresponding record on Force.com with the attributes of self.
       #
       #    client.materialize("Car")
@@ -82,8 +82,7 @@ module Databasedotcom
         if self.Id.nil?
           self.client.create(self.class, attr_hash)
         else
-          attr_hash.delete_if { |key, value| !self.class.type_map[key][:updateable?] }
-          self.client.update(self.class, self.Id, attr_hash)
+          self.client.update(self.class, self.Id, self.class.updateable_only(attr_hash))
         end
       end  
 
@@ -161,6 +160,16 @@ module Databasedotcom
       # Returns true if the attribute +attr_name+ can be updated. Raises ArgumentError if attribute does not exist.
       def self.updateable?(attr_name)
         self.type_map_attr(attr_name, :updateable?)
+      end
+      
+      # Returns filtered hash of attributes that can be updated
+      def self.updateable_only(attrs)
+        attrs.reject { |key, value| !self.updateable?(key) }
+      end
+      
+      # Returns true if the attribute +attr_name_ can be created. Raises ArgumentError if attribute does not exist.
+      def self.createable?(attr_name)
+        self.type_map_attr(attr_name, :createable?)
       end
 
       # Delegates to Client.find with arguments +record_id+ and self
